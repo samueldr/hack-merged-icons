@@ -12,6 +12,12 @@ This currently serves to workaround those bugs:
 But it turns out that this is also useful as a general way to force an icon
 theme to work without involving user-side configuration. ¯\\\_(ツ)\_/¯
 
+You can observe the usefulness of this hack by using Plasma Mobile apps, e.g.
+*Alligator* or *Angelfish*, under *Phosh*. Without this hack they will be
+missing some icons. With this hack, they will be using icons, and if used
+wihout additional themes, and removing legacy icons, will even fallback to
+the breeze theme!
+
 
 Usage
 -----
