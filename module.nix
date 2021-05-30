@@ -42,6 +42,7 @@ in
 
             The icon theme 
           '';
+          default = [];
           type = with lib.types; listOf path;
         };
         themeName = lib.mkOption {
