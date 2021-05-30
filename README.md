@@ -48,7 +48,7 @@ Example usage:
 ```
 
 > **NOTE**: by default both *Adwaita* and *Breeze* are included in fallback
-> themes. Additionally this, by default, masquerades as `hioclor`. This means
+> themes. Additionally this, by default, masquerades as `hicolor`. This means
 > that by default icons should always resolve when using this.
 
 
