@@ -147,7 +147,14 @@ icon_theme_index_files.each do |index_file|
     path.gsub(theme_dir, "")
   end
   unqualified_files.each do |file|
-    orig = File.realpath(File.join(theme_dir, file))
+    orig =
+      begin
+        File.realpath(File.join(theme_dir, file))
+      rescue Errno::ENOENT
+        # Skip dangling links
+        $stderr.puts "(Skipping dangling symlink #{File.join(theme_dir, file)})"
+        next
+      end
     new = File.join($theme_path, file)
     FileUtils.mkdir_p(File.dirname(new))
     FileUtils.ln_s(orig, new, force: true)
