@@ -9,6 +9,50 @@ end
 
 include FileUtils
 
+def normalize_context(in_name)
+  name = in_name.downcase
+  case name
+  when "places"
+    # Actually out of spec, merging with MimeTypes is easier to deal with...
+    "MimeTypes"
+  when "mimetypes"
+    "MimeTypes"
+  when "devices"
+    "Devices"
+  when "filesystems"
+    "FileSystems"
+  when "actions"
+    "Actions"
+
+  # Actually out of spec ????
+  # https://specifications.freedesktop.org/icon-theme-spec/icon-theme-spec-latest.html#context
+
+  when "animations"
+    "Animations"
+  when "applications"
+    "Applications"
+  when "categories"
+    "Categories"
+  when "emblems"
+    "Emblems"
+  when "emotes"
+    "Emotes"
+  when "international"
+    "International"
+  when "status"
+    "Status"
+  when "stock"
+    "Stock"
+  when "legacy"
+    "Legacy"
+  when "ui"
+    "UI"
+  else
+    $stderr.puts("WARNING: Context #{in_name} is unexpected.")
+    in_name
+  end
+end
+
 class Theme # {{{
   # Raw ini-like data for the icon theme
   attr_accessor :data
@@ -82,7 +126,7 @@ class Theme # {{{
       dir_path = File.join(@path, directory_name)
       next unless Dir.exists?(dir_path)
       data = @data[directory_name]
-      context = data["Context"]
+      context = normalize_context(data["Context"])
       Dir.entries(dir_path).each do |name|
         next if name.match(/^\.\.?$/)
         next unless name.match(/(\.png|\.svg)$/)
