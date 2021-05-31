@@ -13,6 +13,9 @@ class Theme # {{{
   # Raw ini-like data for the icon theme
   attr_accessor :data
 
+  # Path for the theme
+  attr_accessor :path
+
   def initialize()
     @data = Hash.new() { |h, k| h[k] = {} }
   end
@@ -65,27 +68,59 @@ class Theme # {{{
     end
   end
 
-  def self.read(filename)
-    self.unserialize(File.read(filename))
+  # Returns a hash of the form:
+  # {
+  #   "Context/extensionless-icon-name" => [
+  #     [ "/prefix/share/icons/the-theme", "/directory/icon.ext" ],
+  #   ]
+  # }
+  def known_icons()
+    @known_icons if @known_icons
+
+    @known_icons = {}
+    directories.each do |directory_name|
+      dir_path = File.join(@path, directory_name)
+      next unless Dir.exists?(dir_path)
+      data = @data[directory_name]
+      context = data["Context"]
+      Dir.entries(dir_path).each do |name|
+        next if name.match(/^\.\.?$/)
+        next unless name.match(/(\.png|\.svg)$/)
+        extensionless_icon_name = name.sub(/\.[^.]+/, "")
+        name_with_context = "#{context}/#{extensionless_icon_name}"
+        @known_icons[name_with_context] ||= []
+        entry = [
+          @path,
+          File.join(dir_path, name).sub(/^#{@path}/, "")
+        ]
+        @known_icons[name_with_context] << entry
+      end
+    end
+    @known_icons
   end
 
-  def self.unserialize(contents)
+  def self.read(path)
     Theme.new().tap do |inst|
-      # Strip comments, filter empty lines, strip beginning/end spaces
-      contents = contents
-        .lines
-        .map {|l| l.gsub(/#.*/, "")}
-        .filter {|l| !l.match(/^\s*$/)}
-        .map(&:strip)
-      current_category = nil
-      contents.each do |line|
-        if match = line.match(/^\[(.+)\]$/)
-          current_category = inst.data[match[1]]
-        else
-          raise "Assigning value without a category" unless current_category
-          k, v = line.split("=", 2).map(&:strip)
-          current_category[k] = v
-        end
+      inst.path = File.dirname(path)
+      inst.unserialize(File.read(path))
+    end
+  end
+
+  def unserialize(contents)
+    # Strip comments, filter empty lines, strip beginning/end spaces
+    contents = contents
+      .lines
+      .map {|l| l.gsub(/#.*/, "")}
+      .filter {|l| !l.match(/^\s*$/)}
+      .map(&:strip)
+    current_category = nil
+    contents.each do |line|
+      if match = line.match(/^\[(.+)\]$/)
+        current_category = self.data[match[1]]
+      else
+        raise "Assigning value without a category" unless current_category
+        k, v = line.split("=", 2).map(&:strip)
+        current_category[k] = v
       end
     end
   end
@@ -133,41 +168,60 @@ icon_theme_index_files =
 
 $theme_path = File.join($out, "share/icons/#{$theme_name}")
 
+
+#
+# Read icon themes
+#
+
+icon_themes = icon_theme_index_files.map do |index_file|
+  Theme.read(index_file)
+end
+
+
+#
+# Identify icon source
+#
+
+# We have to pick one icon source per icon name.
+# Otherwise we might have a bigger-sized icon that doesn't actually match the
+# smaller icons!
+
+# Icons have to be kept per (extension-less) filename and "context".
+known_icons = icon_themes.map(&:known_icons).reduce(&:merge)
+
+
 #
 # Merged directory contents
 #
 
 mkdir_p($theme_path)
 
-# Work through all themes, making a symlink farm for every file.
-# This will prefer themes listed last.
-icon_theme_index_files.each do |index_file|
-  theme_dir = File.dirname(index_file)
-  unqualified_files = Dir.glob(File.join(theme_dir, "**", "*.{png,svg}")).map do |path|
-    path.gsub(theme_dir, "")
-  end
-  unqualified_files.each do |file|
-    orig =
-      begin
-        File.realpath(File.join(theme_dir, file))
-      rescue Errno::ENOENT
-        # Skip dangling links
-        $stderr.puts "(Skipping dangling symlink #{File.join(theme_dir, file)})"
-        next
-      end
-    new = File.join($theme_path, file)
-    FileUtils.mkdir_p(File.dirname(new))
-    FileUtils.ln_s(orig, new, force: true)
+# Create all directories we're going to symlink into
+icon_themes.each do |theme|
+  theme.directories.each do |dir|
+    mkdir_p(File.join($theme_path, dir))
   end
 end
+
+# Given all known icons, symlink them
+known_icons.values.flatten(1).each do |entry|
+  theme_dir, icon_name = entry
+  orig =
+    begin
+      File.realpath(File.join(theme_dir, icon_name))
+    rescue Errno::ENOENT
+      # Skip dangling links
+      $stderr.puts "(Skipping dangling symlink #{File.join(theme_dir, icon_name)})"
+      next
+    end
+  new = File.join($theme_path, icon_name)
+  FileUtils.ln_s(orig, new, force: true)
+end
+
 
 #
 # Build the index.theme for the merged icon set
 #
-
-icon_themes = icon_theme_index_files.map do |index_file|
-  Theme.read(index_file)
-end
 
 merged_theme = Theme.new()
 merged_theme.name = "Merged icons"
